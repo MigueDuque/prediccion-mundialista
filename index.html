@@ -20,83 +20,105 @@
 const { useState, useMemo } = React;
 
 /*  MODELO PROBABILÍSTICO — MUNDIAL 2026
-    Elo (eloratings.net, 15-jun-2026) + valor + ligas + forma + altura + experiencia
-    → goles esperados → Poisson + Dixon-Coles → P(V/E/V) y líneas de goles.
-    h = altura media plantilla (cm). wc = apariciones mundialistas (incl. 2026). */
+    Base: Elo (eloratings, 15-jun-26) + valor + ligas + forma + altura + experiencia.
+    Contexto por partido: altitud y calor (según sede) vs tolerancia del equipo.
+    → goles esperados → Poisson + Dixon-Coles → P(V/E/V) y líneas.
+    heatTol/altTol: tolerancia 0–1 (clima de origen). Proxies estimados. */
 
 const TEAMS = {
-  "México":        { g:"A", elo:1815, mv:230,  league:0.45, form:0, h:179.5, wc:18, host:true, est:true },
-  "Sudáfrica":     { g:"A", elo:1652, mv:40,   league:0.35, form:0, h:178.9, wc:4,  est:true },
-  "Corea del Sur": { g:"A", elo:1828, mv:175,  league:0.55, form:0, h:182.0, wc:12, est:true },
-  "Chequia":       { g:"A", elo:1788, mv:280,  league:0.85, form:0, h:185.5, wc:1,  est:true },
+  "México":        { g:"A", elo:1815, mv:230,  league:0.45, form:0, h:179.5, wc:18, heatTol:0.85, altTol:1.00, host:true, est:true },
+  "Sudáfrica":     { g:"A", elo:1652, mv:40,   league:0.35, form:0, h:178.9, wc:4,  heatTol:0.75, altTol:0.55, est:true },
+  "Corea del Sur": { g:"A", elo:1828, mv:175,  league:0.55, form:0, h:182.0, wc:12, heatTol:0.60, altTol:0.30, est:true },
+  "Chequia":       { g:"A", elo:1788, mv:280,  league:0.85, form:0, h:185.5, wc:1,  heatTol:0.30, altTol:0.30, est:true },
 
-  "Canadá":        { g:"B", elo:1766, mv:228,  league:0.65, form:0, h:182.0, wc:3,  host:true, est:true },
-  "Bosnia":        { g:"B", elo:1700, mv:210,  league:0.80, form:0, h:187.2, wc:2,  est:true },
-  "Catar":         { g:"B", elo:1688, mv:23,   league:0.05, form:0, h:179.4, wc:2,  est:true },
-  "Suiza":         { g:"B", elo:1890, mv:290,  league:0.90, form:0, h:185.0, wc:13, est:true },
+  "Canadá":        { g:"B", elo:1766, mv:228,  league:0.65, form:0, h:182.0, wc:3,  heatTol:0.45, altTol:0.30, host:true, est:true },
+  "Bosnia":        { g:"B", elo:1700, mv:210,  league:0.80, form:0, h:187.2, wc:2,  heatTol:0.40, altTol:0.35, est:true },
+  "Catar":         { g:"B", elo:1688, mv:23,   league:0.05, form:0, h:179.4, wc:2,  heatTol:0.95, altTol:0.30, est:true },
+  "Suiza":         { g:"B", elo:1890, mv:290,  league:0.90, form:0, h:185.0, wc:13, heatTol:0.35, altTol:0.40, est:true },
 
-  "Brasil":        { g:"C", elo:1978, mv:941,  league:0.90, form:1, h:182.5, wc:23 },
-  "Marruecos":     { g:"C", elo:1850, mv:568,  league:0.85, form:0, h:182.0, wc:7,  est:true },
-  "Haití":         { g:"C", elo:1572, mv:55,   league:0.50, form:0, h:181.0, wc:2,  est:true },
-  "Escocia":       { g:"C", elo:1788, mv:215,  league:0.85, form:0, h:184.5, wc:9,  est:true },
+  "Brasil":        { g:"C", elo:1978, mv:941,  league:0.90, form:1, h:182.5, wc:23, heatTol:0.85, altTol:0.40 },
+  "Marruecos":     { g:"C", elo:1850, mv:568,  league:0.85, form:0, h:182.0, wc:7,  heatTol:0.90, altTol:0.40, est:true },
+  "Haití":         { g:"C", elo:1572, mv:55,   league:0.50, form:0, h:181.0, wc:2,  heatTol:0.90, altTol:0.30, est:true },
+  "Escocia":       { g:"C", elo:1788, mv:215,  league:0.85, form:0, h:184.5, wc:9,  heatTol:0.30, altTol:0.30, est:true },
 
-  "Estados Unidos":{ g:"D", elo:1788, mv:444,  league:0.70, form:0, h:183.0, wc:12, host:true, est:true },
-  "Paraguay":      { g:"D", elo:1742, mv:120,  league:0.55, form:0, h:182.0, wc:9,  est:true },
-  "Australia":     { g:"D", elo:1762, mv:110,  league:0.55, form:0, h:183.5, wc:7,  est:true },
-  "Turquía":       { g:"D", elo:1858, mv:550,  league:0.75, form:0, h:183.0, wc:3,  est:true },
+  "Estados Unidos":{ g:"D", elo:1788, mv:444,  league:0.70, form:0, h:183.0, wc:12, heatTol:0.65, altTol:0.40, host:true, est:true },
+  "Paraguay":      { g:"D", elo:1742, mv:120,  league:0.55, form:0, h:182.0, wc:9,  heatTol:0.80, altTol:0.35, est:true },
+  "Australia":     { g:"D", elo:1762, mv:110,  league:0.55, form:0, h:183.5, wc:7,  heatTol:0.80, altTol:0.35, est:true },
+  "Turquía":       { g:"D", elo:1858, mv:550,  league:0.75, form:0, h:183.0, wc:3,  heatTol:0.60, altTol:0.35, est:true },
 
-  "Alemania":      { g:"E", elo:1939, mv:1050, league:0.95, form:5, h:185.5, wc:21 },
-  "Curazao":       { g:"E", elo:1590, mv:30,   league:0.55, form:0, h:181.0, wc:1,  est:true },
-  "Costa de Marfil":{g:"E", elo:1840, mv:617,  league:0.85, form:0, h:183.0, wc:4,  est:true },
-  "Ecuador":       { g:"E", elo:1908, mv:380,  league:0.70, form:0, h:181.5, wc:5,  est:true },
+  "Alemania":      { g:"E", elo:1939, mv:1050, league:0.95, form:5, h:185.5, wc:21, heatTol:0.30, altTol:0.30 },
+  "Curazao":       { g:"E", elo:1590, mv:30,   league:0.55, form:0, h:181.0, wc:1,  heatTol:0.90, altTol:0.30, est:true },
+  "Costa de Marfil":{g:"E", elo:1840, mv:617,  league:0.85, form:0, h:183.0, wc:4,  heatTol:0.95, altTol:0.35, est:true },
+  "Ecuador":       { g:"E", elo:1908, mv:380,  league:0.70, form:0, h:181.5, wc:5,  heatTol:0.80, altTol:0.90, est:true },
 
-  "Países Bajos":  { g:"F", elo:1944, mv:900,  league:0.95, form:3, h:184.9, wc:12 },
-  "Japón":         { g:"F", elo:1910, mv:320,  league:0.65, form:4, h:180.0, wc:8 },
-  "Suecia":        { g:"F", elo:1818, mv:450,  league:0.85, form:0, h:185.0, wc:13, est:true },
-  "Túnez":         { g:"F", elo:1672, mv:60,   league:0.55, form:0, h:182.0, wc:7,  est:true },
+  "Países Bajos":  { g:"F", elo:1944, mv:900,  league:0.95, form:3, h:184.9, wc:12, heatTol:0.30, altTol:0.30 },
+  "Japón":         { g:"F", elo:1910, mv:320,  league:0.65, form:4, h:180.0, wc:8,  heatTol:0.60, altTol:0.30 },
+  "Suecia":        { g:"F", elo:1818, mv:450,  league:0.85, form:0, h:185.0, wc:13, heatTol:0.25, altTol:0.30, est:true },
+  "Túnez":         { g:"F", elo:1672, mv:60,   league:0.55, form:0, h:182.0, wc:7,  heatTol:0.90, altTol:0.40, est:true },
 
-  "Bélgica":       { g:"G", elo:1850, mv:550,  league:0.90, form:0, h:185.5, wc:15, est:true },
-  "Egipto":        { g:"G", elo:1752, mv:200,  league:0.50, form:0, h:182.0, wc:4,  est:true },
-  "Irán":          { g:"G", elo:1800, mv:38,   league:0.25, form:0, h:183.0, wc:7,  est:true },
-  "Nueva Zelanda": { g:"G", elo:1602, mv:40,   league:0.45, form:0, h:184.0, wc:3,  est:true },
+  "Bélgica":       { g:"G", elo:1850, mv:550,  league:0.90, form:0, h:185.5, wc:15, heatTol:0.35, altTol:0.30, est:true },
+  "Egipto":        { g:"G", elo:1752, mv:200,  league:0.50, form:0, h:182.0, wc:4,  heatTol:0.90, altTol:0.35, est:true },
+  "Irán":          { g:"G", elo:1800, mv:38,   league:0.25, form:0, h:183.0, wc:7,  heatTol:0.80, altTol:0.60, est:true },
+  "Nueva Zelanda": { g:"G", elo:1602, mv:40,   league:0.45, form:0, h:184.0, wc:3,  heatTol:0.40, altTol:0.30, est:true },
 
-  "España":        { g:"H", elo:2157, mv:1410, league:1.00, form:4, h:181.7, wc:17 },
-  "Cabo Verde":    { g:"H", elo:1640, mv:80,   league:0.60, form:0, h:181.0, wc:1,  est:true },
-  "Arabia Saudí":  { g:"H", elo:1662, mv:40,   league:0.05, form:0, h:178.4, wc:7,  est:true },
-  "Uruguay":       { g:"H", elo:1888, mv:600,  league:0.85, form:0, h:182.5, wc:15, est:true },
+  "España":        { g:"H", elo:2157, mv:1410, league:1.00, form:4, h:181.7, wc:17, heatTol:0.60, altTol:0.40 },
+  "Cabo Verde":    { g:"H", elo:1640, mv:80,   league:0.60, form:0, h:181.0, wc:1,  heatTol:0.90, altTol:0.35, est:true },
+  "Arabia Saudí":  { g:"H", elo:1662, mv:40,   league:0.05, form:0, h:178.4, wc:7,  heatTol:0.95, altTol:0.35, est:true },
+  "Uruguay":       { g:"H", elo:1888, mv:600,  league:0.85, form:0, h:182.5, wc:15, heatTol:0.60, altTol:0.35, est:true },
 
-  "Francia":       { g:"I", elo:2063, mv:1460, league:1.00, form:4, h:184.9, wc:17 },
-  "Senegal":       { g:"I", elo:1869, mv:550,  league:0.85, form:0, h:184.0, wc:4,  est:true },
-  "Irak":          { g:"I", elo:1650, mv:25,   league:0.15, form:0, h:181.0, wc:2,  est:true },
-  "Noruega":       { g:"I", elo:1914, mv:600,  league:0.90, form:5, h:187.2, wc:4 },
+  "Francia":       { g:"I", elo:2063, mv:1460, league:1.00, form:4, h:184.9, wc:17, heatTol:0.45, altTol:0.35 },
+  "Senegal":       { g:"I", elo:1869, mv:550,  league:0.85, form:0, h:184.0, wc:4,  heatTol:0.95, altTol:0.35, est:true },
+  "Irak":          { g:"I", elo:1650, mv:25,   league:0.15, form:0, h:181.0, wc:2,  heatTol:0.90, altTol:0.35, est:true },
+  "Noruega":       { g:"I", elo:1914, mv:600,  league:0.90, form:5, h:187.2, wc:4,  heatTol:0.20, altTol:0.35 },
 
-  "Argentina":     { g:"J", elo:2115, mv:739,  league:0.85, form:2, h:179.7, wc:19 },
-  "Argelia":       { g:"J", elo:1776, mv:300,  league:0.80, form:0, h:182.0, wc:5,  est:true },
-  "Austria":       { g:"J", elo:1792, mv:350,  league:0.85, form:0, h:185.0, wc:8,  est:true },
-  "Jordania":      { g:"J", elo:1640, mv:23,   league:0.10, form:0, h:180.0, wc:1,  est:true },
+  "Argentina":     { g:"J", elo:2115, mv:739,  league:0.85, form:2, h:179.7, wc:19, heatTol:0.65, altTol:0.45 },
+  "Argelia":       { g:"J", elo:1776, mv:300,  league:0.80, form:0, h:182.0, wc:5,  heatTol:0.90, altTol:0.45, est:true },
+  "Austria":       { g:"J", elo:1792, mv:350,  league:0.85, form:0, h:185.0, wc:8,  heatTol:0.30, altTol:0.40, est:true },
+  "Jordania":      { g:"J", elo:1640, mv:23,   league:0.10, form:0, h:180.0, wc:1,  heatTol:0.90, altTol:0.40, est:true },
 
-  "Portugal":      { g:"K", elo:1989, mv:1000, league:0.95, form:2, h:181.5, wc:9 },
-  "RD Congo":      { g:"K", elo:1722, mv:280,  league:0.80, form:0, h:183.0, wc:2,  est:true },
-  "Uzbekistán":    { g:"K", elo:1700, mv:61,   league:0.15, form:0, h:183.0, wc:1,  est:true },
-  "Colombia":      { g:"K", elo:1982, mv:600,  league:0.85, form:2, h:180.5, wc:7 },
+  "Portugal":      { g:"K", elo:1989, mv:1000, league:0.95, form:2, h:181.5, wc:9,  heatTol:0.60, altTol:0.35 },
+  "RD Congo":      { g:"K", elo:1722, mv:280,  league:0.80, form:0, h:183.0, wc:2,  heatTol:0.90, altTol:0.35, est:true },
+  "Uzbekistán":    { g:"K", elo:1700, mv:61,   league:0.15, form:0, h:183.0, wc:1,  heatTol:0.70, altTol:0.45, est:true },
+  "Colombia":      { g:"K", elo:1982, mv:600,  league:0.85, form:2, h:180.5, wc:7,  heatTol:0.80, altTol:0.85 },
 
-  "Inglaterra":    { g:"L", elo:2024, mv:1400, league:1.00, form:5, h:184.2, wc:17 },
-  "Croacia":       { g:"L", elo:1912, mv:380,  league:0.85, form:4, h:184.8, wc:7 },
-  "Ghana":         { g:"L", elo:1762, mv:280,  league:0.80, form:0, h:182.0, wc:5,  est:true },
-  "Panamá":        { g:"L", elo:1690, mv:60,   league:0.35, form:0, h:180.0, wc:2,  est:true },
+  "Inglaterra":    { g:"L", elo:2024, mv:1400, league:1.00, form:5, h:184.2, wc:17, heatTol:0.35, altTol:0.30 },
+  "Croacia":       { g:"L", elo:1912, mv:380,  league:0.85, form:4, h:184.8, wc:7,  heatTol:0.40, altTol:0.35 },
+  "Ghana":         { g:"L", elo:1762, mv:280,  league:0.80, form:0, h:182.0, wc:5,  heatTol:0.95, altTol:0.35, est:true },
+  "Panamá":        { g:"L", elo:1690, mv:60,   league:0.35, form:0, h:180.0, wc:2,  heatTol:0.90, altTol:0.30, est:true },
+};
+
+// Sedes 2026: alt en metros, heat 0–1 (junio/julio, día; techo+AC baja el índice).
+const VENUES = {
+  "Neutral":                 { alt:0,    heat:0.00 },
+  "CDMX · Azteca (2240m)":   { alt:2240, heat:0.25 },
+  "Guadalajara (1560m)":     { alt:1560, heat:0.55 },
+  "Monterrey (calor)":       { alt:540,  heat:0.95 },
+  "Miami (calor/humedad)":   { alt:2,    heat:0.95 },
+  "Kansas City (calor)":     { alt:270,  heat:0.85 },
+  "Dallas (techo+AC)":       { alt:180,  heat:0.25 },
+  "Houston (techo+AC)":      { alt:15,   heat:0.25 },
+  "Atlanta (techo+AC)":      { alt:320,  heat:0.25 },
+  "Los Ángeles (SoFi)":      { alt:50,   heat:0.35 },
+  "Filadelfia":              { alt:12,   heat:0.55 },
+  "Nueva York/NJ (MetLife)": { alt:5,    heat:0.55 },
+  "Boston":                  { alt:30,   heat:0.45 },
+  "Bahía SF (Levi's)":       { alt:5,    heat:0.50 },
+  "Seattle":                 { alt:50,   heat:0.30 },
+  "Toronto":                 { alt:90,   heat:0.35 },
+  "Vancouver (techo)":       { alt:5,    heat:0.20 },
 };
 
 const FIXTURES = [
-  { g:"A", a:"México", b:"Sudáfrica", home:"México", result:[2,0] },
+  { g:"A", a:"México", b:"Sudáfrica", home:"México", venue:"CDMX · Azteca (2240m)", result:[2,0] },
   { g:"A", a:"Corea del Sur", b:"Chequia" },
-  { g:"B", a:"Canadá", b:"Bosnia", home:"Canadá" },
+  { g:"B", a:"Canadá", b:"Bosnia", home:"Canadá", venue:"Toronto" },
   { g:"B", a:"Catar", b:"Suiza" },
-  { g:"C", a:"Brasil", b:"Marruecos" },
+  { g:"C", a:"Brasil", b:"Marruecos", venue:"Nueva York/NJ (MetLife)" },
   { g:"C", a:"Haití", b:"Escocia" },
-  { g:"D", a:"Estados Unidos", b:"Paraguay", home:"Estados Unidos" },
+  { g:"D", a:"Estados Unidos", b:"Paraguay", home:"Estados Unidos", venue:"Los Ángeles (SoFi)" },
   { g:"D", a:"Australia", b:"Turquía" },
   { g:"E", a:"Alemania", b:"Curazao" },
-  { g:"E", a:"Costa de Marfil", b:"Ecuador" },
+  { g:"E", a:"Costa de Marfil", b:"Ecuador", venue:"Filadelfia" },
   { g:"F", a:"Países Bajos", b:"Japón" },
   { g:"F", a:"Suecia", b:"Túnez" },
   { g:"G", a:"Bélgica", b:"Egipto" },
@@ -108,7 +130,7 @@ const FIXTURES = [
   { g:"J", a:"Argentina", b:"Argelia" },
   { g:"J", a:"Austria", b:"Jordania" },
   { g:"K", a:"Portugal", b:"RD Congo" },
-  { g:"K", a:"Colombia", b:"Uzbekistán" },
+  { g:"K", a:"Colombia", b:"Uzbekistán", venue:"CDMX · Azteca (2240m)" },
   { g:"L", a:"Inglaterra", b:"Croacia" },
   { g:"L", a:"Ghana", b:"Panamá" },
 ];
@@ -117,30 +139,24 @@ const names = Object.keys(TEAMS);
 const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
 const std = (a) => { const m = mean(a); return Math.sqrt(mean(a.map((x) => (x - m) ** 2))); };
 const zmap = (vals) => { const m = mean(vals), s = std(vals); return (x) => (x - m) / s; };
-
 const zMV = zmap(names.map((n) => Math.log(TEAMS[n].mv)));
 const zLg = zmap(names.map((n) => TEAMS[n].league));
 const zH  = zmap(names.map((n) => TEAMS[n].h));
 const zE  = zmap(names.map((n) => Math.log(TEAMS[n].wc)));
 const Z = {};
 names.forEach((n) => {
-  Z[n] = {
-    mv: zMV(Math.log(TEAMS[n].mv)),
-    league: zLg(TEAMS[n].league),
-    height: zH(TEAMS[n].h),
-    exp: zE(Math.log(TEAMS[n].wc)),
-  };
+  Z[n] = { mv:zMV(Math.log(TEAMS[n].mv)), league:zLg(TEAMS[n].league), height:zH(TEAMS[n].h), exp:zE(Math.log(TEAMS[n].wc)) };
 });
 
 function effective(name, w) {
   const t = TEAMS[name];
-  return t.elo
-    + w.mv * Z[name].mv * 40
-    + w.league * Z[name].league * 25
-    + w.form * t.form * 6
-    + w.height * Z[name].height * 12
-    + w.exp * Z[name].exp * 12;
+  return t.elo + w.mv*Z[name].mv*40 + w.league*Z[name].league*25 + w.form*t.form*6
+    + w.height*Z[name].height*12 + w.exp*Z[name].exp*12;
 }
+const altPen = (name, venue) => Math.min(venue.alt/2240, 1) * (1 - TEAMS[name].altTol);
+const heatPen = (name, venue) => venue.heat * (1 - TEAMS[name].heatTol);
+const altPts = (name, venue, w) => w.alt * altPen(name, venue) * 60;
+const heatPts = (name, venue, w) => w.heat * heatPen(name, venue) * 50;
 
 const fact = (k) => (k <= 1 ? 1 : k * fact(k - 1));
 const pois = (k, l) => (Math.exp(-l) * l ** k) / fact(k);
@@ -153,9 +169,12 @@ function tau(x, y, la, lb) {
   return 1;
 }
 
-function predict(a, b, w, homeTeam) {
+function predict(a, b, w, homeTeam, venue) {
   const MU = 2.6, MAXG = 8;
-  let dR = effective(a, w) - effective(b, w);
+  const v = venue || VENUES["Neutral"];
+  let rA = effective(a, w) - altPts(a, v, w) - heatPts(a, v, w);
+  let rB = effective(b, w) - altPts(b, v, w) - heatPts(b, v, w);
+  let dR = rA - rB;
   if (homeTeam === a) dR += w.host;
   if (homeTeam === b) dR -= w.host;
   let s = Math.max(-2.8, Math.min(2.8, dR / 250));
@@ -193,10 +212,7 @@ function confidence(r) {
   return { label: "Pareja", c: "#e09a7e" };
 }
 
-const C = {
-  bg:"#0a0e14", panel:"#121821", line:"#1e2733",
-  ink:"#e8eaed", muted:"#8a94a6", A:"#46d1c4", B:"#f0a23b", D:"#566072",
-};
+const C = { bg:"#0a0e14", panel:"#121821", line:"#1e2733", ink:"#e8eaed", muted:"#8a94a6", A:"#46d1c4", B:"#f0a23b", D:"#566072" };
 
 function Bar({ r, a, b }) {
   const seg = [{ w:r.pA, c:C.A }, { w:r.pD, c:C.D }, { w:r.pB, c:C.B }];
@@ -208,9 +224,7 @@ function Bar({ r, a, b }) {
         <span style={{ color:C.B }}>{b} · {pct(r.pB)}%</span>
       </div>
       <div className="flex h-9 w-full overflow-hidden rounded" style={{ border:`1px solid ${C.line}` }}>
-        {seg.map((s, k) => (
-          <div key={k} style={{ width:`${s.w*100}%`, background:s.c, transition:"width .35s ease" }} />
-        ))}
+        {seg.map((s, k) => <div key={k} style={{ width:`${s.w*100}%`, background:s.c, transition:"width .35s ease" }} />)}
       </div>
     </div>
   );
@@ -226,7 +240,8 @@ function LineRow({ label, p }) {
 }
 
 function MatchCard({ fx, w }) {
-  const r = predict(fx.a, fx.b, w, fx.home);
+  const v = fx.venue ? VENUES[fx.venue] : VENUES["Neutral"];
+  const r = predict(fx.a, fx.b, w, fx.home, v);
   const conf = confidence(r);
   const winner = r.pA >= r.pB ? fx.a : fx.b;
   const sc = r.top[0];
@@ -250,25 +265,32 @@ function MatchCard({ fx, w }) {
       </div>
       <div className="mt-2 text-xs" style={{ color:C.muted }}>
         Pick: <span style={{ color:C.ink }}>{winner}</span> · {pct(Math.max(r.pA,r.pB))}%
-        {fx.home && <span> · localía {fx.home}</span>}
+        {fx.venue && <span> · {fx.venue}</span>}
       </div>
     </div>
   );
 }
 
-function Detail({ a, b, w, home }) {
-  const r = predict(a, b, w, home);
+function Detail({ a, b, w, home, venueName }) {
+  const v = VENUES[venueName] || VENUES["Neutral"];
+  const r = predict(a, b, w, home, v);
   const conf = confidence(r);
   const winner = r.pA >= r.pB ? a : b;
+  const ctxOn = v.alt > 0 || v.heat > 0;
   const rows = [
     ["Elo (15-jun-26)", Math.round(TEAMS[a].elo), Math.round(TEAMS[b].elo)],
     ["Valor plantilla (€M)", TEAMS[a].mv, TEAMS[b].mv],
     ["Ligas top-5", TEAMS[a].league.toFixed(2), TEAMS[b].league.toFixed(2)],
-    ["Forma (últ. 5)", TEAMS[a].form > 0 ? "+"+TEAMS[a].form : TEAMS[a].form, TEAMS[b].form > 0 ? "+"+TEAMS[b].form : TEAMS[b].form],
+    ["Forma (últ. 5)", TEAMS[a].form>0?"+"+TEAMS[a].form:TEAMS[a].form, TEAMS[b].form>0?"+"+TEAMS[b].form:TEAMS[b].form],
     ["Altura media (cm)", TEAMS[a].h.toFixed(1), TEAMS[b].h.toFixed(1)],
     ["Mundiales (incl. 26)", TEAMS[a].wc, TEAMS[b].wc],
-    ["Rating efectivo", Math.round(effective(a, w)), Math.round(effective(b, w))],
   ];
+  if (ctxOn) {
+    rows.push(["↳ Pérdida altitud", "−"+Math.round(altPts(a,v,w)), "−"+Math.round(altPts(b,v,w))]);
+    rows.push(["↳ Pérdida calor", "−"+Math.round(heatPts(a,v,w)), "−"+Math.round(heatPts(b,v,w))]);
+  }
+  rows.push(["Rating efectivo", Math.round(effective(a,w)-altPts(a,v,w)-heatPts(a,v,w)), Math.round(effective(b,w)-altPts(b,v,w)-heatPts(b,v,w))]);
+
   return (
     <div className="p-5 rounded-lg" style={{ background:C.panel, border:`1px solid ${C.line}` }}>
       <div className="flex items-center justify-between mb-4">
@@ -286,7 +308,6 @@ function Detail({ a, b, w, home }) {
           <div className="font-mono text-3xl mt-1" style={{ color:C.ink }}>{r.la.toFixed(1)}–{r.lb.toFixed(1)}</div>
         </div>
       </div>
-
       <div className="text-xs font-mono mb-1" style={{ color:C.muted }}>LÍNEAS (prob · cuota justa)</div>
       <LineRow label={"Gana " + a} p={r.pA} />
       <LineRow label="Empate" p={r.pD} />
@@ -295,13 +316,9 @@ function Detail({ a, b, w, home }) {
       <LineRow label="Más 2.5 goles" p={r.o25} />
       <LineRow label="Más 3.5 goles" p={r.o35} />
       <LineRow label="Ambos marcan (BTTS)" p={r.btts} />
-
       <div className="mt-3 text-xs" style={{ color:C.muted }}>
-        Otros marcadores: {r.top.map((c, k) => (
-          <span key={k} className="font-mono"> {c.i}–{c.j} ({pct(c.p)}%){k < 3 ? " ·" : ""}</span>
-        ))}
+        Otros marcadores: {r.top.map((c, k) => <span key={k} className="font-mono"> {c.i}–{c.j} ({pct(c.p)}%){k<3?" ·":""}</span>)}
       </div>
-
       <table className="w-full text-sm mt-4">
         <thead>
           <tr style={{ color:C.muted }} className="text-xs">
@@ -312,7 +329,7 @@ function Detail({ a, b, w, home }) {
         </thead>
         <tbody className="font-mono">
           {rows.map((row, k) => (
-            <tr key={k} style={{ borderTop:`1px solid ${C.line}`, color:k === rows.length-1 ? C.ink : C.muted }}>
+            <tr key={k} style={{ borderTop:`1px solid ${C.line}`, color:k===rows.length-1?C.ink:C.muted }}>
               <td className="py-1.5" style={{ fontFamily:"system-ui" }}>{row[0]}</td>
               <td className="py-1.5 text-right">{row[1]}</td>
               <td className="py-1.5 text-right">{row[2]}</td>
@@ -320,10 +337,9 @@ function Detail({ a, b, w, home }) {
           ))}
         </tbody>
       </table>
-
       <div className="mt-4 pt-3 text-sm" style={{ borderTop:`1px solid ${C.line}`, color:C.muted }}>
         Pick del modelo: <span style={{ color:C.ink, fontWeight:600 }}>{winner}</span>
-        {(TEAMS[a].est || TEAMS[b].est) && <span className="text-xs"> · ⚠ Elo/altura estimada en alguna selección</span>}
+        {(TEAMS[a].est || TEAMS[b].est) && <span className="text-xs"> · ⚠ datos estimados en alguna selección</span>}
       </div>
     </div>
   );
@@ -347,15 +363,19 @@ function App() {
   const [a, setA] = useState("Colombia");
   const [b, setB] = useState("Uzbekistán");
   const [home, setHome] = useState("");
-  const [w, setW] = useState({ mv:1.0, league:0.6, form:1.0, host:70, height:0.4, exp:0.4 });
+  const [venue, setVenue] = useState("CDMX · Azteca (2240m)");
+  const [w, setW] = useState({ mv:1.0, league:0.6, form:1.0, host:70, height:0.4, exp:0.4, alt:0.5, heat:0.3 });
   const allNames = useMemo(() => names.slice().sort(), []);
+  const venueNames = useMemo(() => Object.keys(VENUES), []);
   const sliders = [
     { k:"mv", label:"Valor de plantilla", min:0, max:2, step:0.1 },
     { k:"league", label:"Militancia en ligas top", min:0, max:2, step:0.1 },
     { k:"form", label:"Forma reciente", min:0, max:2, step:0.1 },
     { k:"height", label:"Altura · balón parado", min:0, max:2, step:0.1 },
     { k:"exp", label:"Experiencia mundialista", min:0, max:2, step:0.1 },
-    { k:"host", label:"Ventaja de localía (pts)", min:0, max:150, step:10 },
+    { k:"alt", label:"Altitud (sede)", min:0, max:2, step:0.1 },
+    { k:"heat", label:"Calor (sede)", min:0, max:2, step:0.1 },
+    { k:"host", label:"Localía (pts)", min:0, max:150, step:10 },
   ];
 
   return (
@@ -365,15 +385,14 @@ function App() {
           <div className="text-xs font-mono mb-1" style={{ color:C.A }}>MODELO PROBABILÍSTICO · MUNDIAL 2026</div>
           <h1 className="text-2xl font-bold">Predictor de partidos</h1>
           <p className="text-sm mt-1" style={{ color:C.muted }}>
-            Elo + valor + ligas + forma + altura + experiencia → goles esperados → Poisson / Dixon-Coles.
+            Elo + valor + ligas + forma + altura + experiencia + contexto de sede (altitud y calor) → Poisson / Dixon-Coles.
           </p>
         </header>
 
         <div className="flex gap-2 mb-5">
           {[["match","Un partido"], ["all","Jornada 1 completa"]].map(([k, l]) => (
             <button key={k} onClick={() => setMode(k)} className="px-3 py-1.5 rounded text-sm transition"
-              style={{ background:mode===k?C.A:"transparent", color:mode===k?C.bg:C.muted,
-                       border:`1px solid ${mode===k?C.A:C.line}`, fontWeight:mode===k?600:400 }}>
+              style={{ background:mode===k?C.A:"transparent", color:mode===k?C.bg:C.muted, border:`1px solid ${mode===k?C.A:C.line}`, fontWeight:mode===k?600:400 }}>
               {l}
             </button>
           ))}
@@ -389,8 +408,7 @@ function App() {
                   <span className="font-mono" style={{ color:C.ink }}>{w[s.k]}</span>
                 </div>
                 <input type="range" min={s.min} max={s.max} step={s.step} value={w[s.k]}
-                  onChange={(e) => setW({ ...w, [s.k]: parseFloat(e.target.value) })}
-                  className="w-full" style={{ accentColor:C.A }} />
+                  onChange={(e) => setW({ ...w, [s.k]: parseFloat(e.target.value) })} className="w-full" style={{ accentColor:C.A }} />
               </div>
             ))}
           </div>
@@ -398,18 +416,19 @@ function App() {
 
         {mode === "match" ? (
           <React.Fragment>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
               <Select label="Selección A" value={a} onChange={setA} opts={allNames} accent={C.A} />
               <Select label="Selección B" value={b} onChange={setB} opts={allNames} accent={C.B} />
+              <Select label="Sede / contexto" value={venue} onChange={setVenue} opts={venueNames} accent={C.A} />
               <Select label="Localía" value={home} onChange={setHome} opts={["", a, b]} labels={["Neutral", a, b]} accent={C.muted} />
             </div>
             {a !== b
-              ? <Detail a={a} b={b} w={w} home={home} />
+              ? <Detail a={a} b={b} w={w} home={home} venueName={venue} />
               : <div className="text-sm p-4" style={{ color:C.muted }}>Elige dos selecciones distintas.</div>}
             <div className="mt-4 text-xs font-mono" style={{ color:C.muted }}>ATAJOS JORNADA 1</div>
             <div className="flex flex-wrap gap-2 mt-2">
               {FIXTURES.map((fx, k) => (
-                <button key={k} onClick={() => { setA(fx.a); setB(fx.b); setHome(fx.home || ""); }}
+                <button key={k} onClick={() => { setA(fx.a); setB(fx.b); setHome(fx.home || ""); setVenue(fx.venue || "Neutral"); }}
                   className="text-xs px-2 py-1 rounded" style={{ color:C.muted, border:`1px solid ${C.line}` }}>
                   {fx.a.slice(0,3).toUpperCase()}–{fx.b.slice(0,3).toUpperCase()}
                 </button>
@@ -434,9 +453,9 @@ function App() {
         )}
 
         <footer className="mt-8 pt-4 text-xs leading-relaxed" style={{ borderTop:`1px solid ${C.line}`, color:C.muted }}>
-          Elo real (eloratings.net, top-12 al 15-jun-2026) + apariciones mundialistas reales; altura real en ~16 selecciones,
-          estimada en el resto (⚠). Altura y experiencia entran como modificadores secundarios (peso bajo por defecto).
-          Cuotas "justas" = 1÷probabilidad: hay valor si tu casa paga más. No incluye tarjetas, córners, alineaciones ni lesiones.
+          Contexto de sede: la altitud penaliza a equipos no aclimatados (CDMX 2240m, Guadalajara 1560m) y el calor a los de clima frío,
+          salvo sedes con techo+AC (Dallas, Houston, Atlanta). Tolerancias y altura de varias selecciones son proxies estimados (⚠),
+          con peso bajo por defecto porque aún no están calibrados contra histórico. Cuotas "justas" = 1÷probabilidad.
         </footer>
       </div>
     </div>
