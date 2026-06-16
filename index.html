@@ -26,65 +26,65 @@ const { useState, useMemo } = React;
     heatTol/altTol: tolerancia 0–1 (clima de origen). Proxies estimados. */
 
 const TEAMS = {
-  "México":        { g:"A", elo:1815, mv:230,  league:0.45, form:0, h:179.5, wc:18, heatTol:0.85, altTol:1.00, host:true, est:true },
-  "Sudáfrica":     { g:"A", elo:1652, mv:40,   league:0.35, form:0, h:178.9, wc:4,  heatTol:0.75, altTol:0.55, est:true },
-  "Corea del Sur": { g:"A", elo:1828, mv:175,  league:0.55, form:0, h:182.0, wc:12, heatTol:0.60, altTol:0.30, est:true },
-  "Chequia":       { g:"A", elo:1788, mv:280,  league:0.85, form:0, h:185.5, wc:1,  heatTol:0.30, altTol:0.30, est:true },
+  "México":        { g:"A", elo:1815, mv:230,  league:0.45, form:0, h:179.5, wc:18, gf:0.05, heatTol:0.85, altTol:1.00, host:true, est:true },
+  "Sudáfrica":     { g:"A", elo:1652, mv:40,   league:0.35, form:0, h:178.9, wc:4,  gf:-0.05, heatTol:0.75, altTol:0.55, est:true },
+  "Corea del Sur": { g:"A", elo:1828, mv:175,  league:0.55, form:0, h:182.0, wc:12, gf:0.05, heatTol:0.60, altTol:0.30, est:true },
+  "Chequia":       { g:"A", elo:1788, mv:280,  league:0.85, form:0, h:185.5, wc:1,  gf:0.0, heatTol:0.30, altTol:0.30, est:true },
 
-  "Canadá":        { g:"B", elo:1766, mv:228,  league:0.65, form:0, h:182.0, wc:3,  heatTol:0.45, altTol:0.30, host:true, est:true },
-  "Bosnia":        { g:"B", elo:1700, mv:210,  league:0.80, form:0, h:187.2, wc:2,  heatTol:0.40, altTol:0.35, est:true },
-  "Catar":         { g:"B", elo:1688, mv:23,   league:0.05, form:0, h:179.4, wc:2,  heatTol:0.95, altTol:0.30, est:true },
-  "Suiza":         { g:"B", elo:1890, mv:290,  league:0.90, form:0, h:185.0, wc:13, heatTol:0.35, altTol:0.40, est:true },
+  "Canadá":        { g:"B", elo:1766, mv:228,  league:0.65, form:0, h:182.0, wc:3,  gf:0.05, heatTol:0.45, altTol:0.30, host:true, est:true },
+  "Bosnia":        { g:"B", elo:1700, mv:210,  league:0.80, form:0, h:187.2, wc:2,  gf:0.05, heatTol:0.40, altTol:0.35, est:true },
+  "Catar":         { g:"B", elo:1688, mv:23,   league:0.05, form:0, h:179.4, wc:2,  gf:-0.1, heatTol:0.95, altTol:0.30, est:true },
+  "Suiza":         { g:"B", elo:1890, mv:290,  league:0.90, form:0, h:185.0, wc:13, gf:-0.15, heatTol:0.35, altTol:0.40, est:true },
 
-  "Brasil":        { g:"C", elo:1978, mv:941,  league:0.90, form:1, h:182.5, wc:23, heatTol:0.85, altTol:0.40 },
-  "Marruecos":     { g:"C", elo:1850, mv:568,  league:0.85, form:0, h:182.0, wc:7,  heatTol:0.90, altTol:0.40, est:true },
-  "Haití":         { g:"C", elo:1572, mv:55,   league:0.50, form:0, h:181.0, wc:2,  heatTol:0.90, altTol:0.30, est:true },
-  "Escocia":       { g:"C", elo:1788, mv:215,  league:0.85, form:0, h:184.5, wc:9,  heatTol:0.30, altTol:0.30, est:true },
+  "Brasil":        { g:"C", elo:1978, mv:941,  league:0.90, form:1, h:182.5, wc:23, gf:0.25, heatTol:0.85, altTol:0.40 },
+  "Marruecos":     { g:"C", elo:1850, mv:568,  league:0.85, form:0, h:182.0, wc:7,  gf:-0.15, heatTol:0.90, altTol:0.40, est:true },
+  "Haití":         { g:"C", elo:1572, mv:55,   league:0.50, form:0, h:181.0, wc:2,  gf:0.05, heatTol:0.90, altTol:0.30, est:true },
+  "Escocia":       { g:"C", elo:1788, mv:215,  league:0.85, form:0, h:184.5, wc:9,  gf:0.0, heatTol:0.30, altTol:0.30, est:true },
 
-  "Estados Unidos":{ g:"D", elo:1788, mv:444,  league:0.70, form:0, h:183.0, wc:12, heatTol:0.65, altTol:0.40, host:true, est:true },
-  "Paraguay":      { g:"D", elo:1742, mv:120,  league:0.55, form:0, h:182.0, wc:9,  heatTol:0.80, altTol:0.35, est:true },
-  "Australia":     { g:"D", elo:1762, mv:110,  league:0.55, form:0, h:183.5, wc:7,  heatTol:0.80, altTol:0.35, est:true },
-  "Turquía":       { g:"D", elo:1858, mv:550,  league:0.75, form:0, h:183.0, wc:3,  heatTol:0.60, altTol:0.35, est:true },
+  "Estados Unidos":{ g:"D", elo:1788, mv:444,  league:0.70, form:0, h:183.0, wc:12, gf:0.0, heatTol:0.65, altTol:0.40, host:true, est:true },
+  "Paraguay":      { g:"D", elo:1742, mv:120,  league:0.55, form:0, h:182.0, wc:9,  gf:-0.15, heatTol:0.80, altTol:0.35, est:true },
+  "Australia":     { g:"D", elo:1762, mv:110,  league:0.55, form:0, h:183.5, wc:7,  gf:0.1, heatTol:0.80, altTol:0.35, est:true },
+  "Turquía":       { g:"D", elo:1858, mv:550,  league:0.75, form:0, h:183.0, wc:3,  gf:0.1, heatTol:0.60, altTol:0.35, est:true },
 
-  "Alemania":      { g:"E", elo:1939, mv:1050, league:0.95, form:5, h:185.5, wc:21, heatTol:0.30, altTol:0.30 },
-  "Curazao":       { g:"E", elo:1590, mv:30,   league:0.55, form:0, h:181.0, wc:1,  heatTol:0.90, altTol:0.30, est:true },
-  "Costa de Marfil":{g:"E", elo:1840, mv:617,  league:0.85, form:0, h:183.0, wc:4,  heatTol:0.95, altTol:0.35, est:true },
-  "Ecuador":       { g:"E", elo:1908, mv:380,  league:0.70, form:0, h:181.5, wc:5,  heatTol:0.80, altTol:0.90, est:true },
+  "Alemania":      { g:"E", elo:1939, mv:1050, league:0.95, form:5, h:185.5, wc:21, gf:0.35, heatTol:0.30, altTol:0.30 },
+  "Curazao":       { g:"E", elo:1590, mv:30,   league:0.55, form:0, h:181.0, wc:1,  gf:0.1, heatTol:0.90, altTol:0.30, est:true },
+  "Costa de Marfil":{g:"E", elo:1840, mv:617,  league:0.85, form:0, h:183.0, wc:4,  gf:0.05, heatTol:0.95, altTol:0.35, est:true },
+  "Ecuador":       { g:"E", elo:1908, mv:380,  league:0.70, form:0, h:181.5, wc:5,  gf:-0.05, heatTol:0.80, altTol:0.90, est:true },
 
-  "Países Bajos":  { g:"F", elo:1944, mv:900,  league:0.95, form:3, h:184.9, wc:12, heatTol:0.30, altTol:0.30 },
-  "Japón":         { g:"F", elo:1910, mv:320,  league:0.65, form:4, h:180.0, wc:8,  heatTol:0.60, altTol:0.30 },
-  "Suecia":        { g:"F", elo:1818, mv:450,  league:0.85, form:0, h:185.0, wc:13, heatTol:0.25, altTol:0.30, est:true },
-  "Túnez":         { g:"F", elo:1672, mv:60,   league:0.55, form:0, h:182.0, wc:7,  heatTol:0.90, altTol:0.40, est:true },
+  "Países Bajos":  { g:"F", elo:1944, mv:900,  league:0.95, form:3, h:184.9, wc:12, gf:0.3, heatTol:0.30, altTol:0.30 },
+  "Japón":         { g:"F", elo:1910, mv:320,  league:0.65, form:4, h:180.0, wc:8,  gf:0.05, heatTol:0.60, altTol:0.30 },
+  "Suecia":        { g:"F", elo:1818, mv:450,  league:0.85, form:0, h:185.0, wc:13, gf:0.25, heatTol:0.25, altTol:0.30, est:true },
+  "Túnez":         { g:"F", elo:1672, mv:60,   league:0.55, form:0, h:182.0, wc:7,  gf:-0.15, heatTol:0.90, altTol:0.40, est:true },
 
-  "Bélgica":       { g:"G", elo:1850, mv:550,  league:0.90, form:0, h:185.5, wc:15, heatTol:0.35, altTol:0.30, est:true },
-  "Egipto":        { g:"G", elo:1752, mv:200,  league:0.50, form:0, h:182.0, wc:4,  heatTol:0.90, altTol:0.35, est:true },
-  "Irán":          { g:"G", elo:1800, mv:38,   league:0.25, form:0, h:183.0, wc:7,  heatTol:0.80, altTol:0.60, est:true },
-  "Nueva Zelanda": { g:"G", elo:1602, mv:40,   league:0.45, form:0, h:184.0, wc:3,  heatTol:0.40, altTol:0.30, est:true },
+  "Bélgica":       { g:"G", elo:1850, mv:550,  league:0.90, form:0, h:185.5, wc:15, gf:0.15, heatTol:0.35, altTol:0.30, est:true },
+  "Egipto":        { g:"G", elo:1752, mv:200,  league:0.50, form:0, h:182.0, wc:4,  gf:-0.15, heatTol:0.90, altTol:0.35, est:true },
+  "Irán":          { g:"G", elo:1800, mv:38,   league:0.25, form:0, h:183.0, wc:7,  gf:-0.4, heatTol:0.80, altTol:0.60, est:true },
+  "Nueva Zelanda": { g:"G", elo:1602, mv:40,   league:0.45, form:0, h:184.0, wc:3,  gf:-0.05, heatTol:0.40, altTol:0.30, est:true },
 
-  "España":        { g:"H", elo:2157, mv:1410, league:1.00, form:4, h:181.7, wc:17, heatTol:0.60, altTol:0.40 },
-  "Cabo Verde":    { g:"H", elo:1640, mv:80,   league:0.60, form:0, h:181.0, wc:1,  heatTol:0.90, altTol:0.35, est:true },
-  "Arabia Saudí":  { g:"H", elo:1662, mv:40,   league:0.05, form:0, h:178.4, wc:7,  heatTol:0.95, altTol:0.35, est:true },
-  "Uruguay":       { g:"H", elo:1888, mv:600,  league:0.85, form:0, h:182.5, wc:15, heatTol:0.60, altTol:0.35, est:true },
+  "España":        { g:"H", elo:2157, mv:1410, league:1.00, form:4, h:181.7, wc:17, gf:0.2, heatTol:0.60, altTol:0.40 },
+  "Cabo Verde":    { g:"H", elo:1640, mv:80,   league:0.60, form:0, h:181.0, wc:1,  gf:0.0, heatTol:0.90, altTol:0.35, est:true },
+  "Arabia Saudí":  { g:"H", elo:1662, mv:40,   league:0.05, form:0, h:178.4, wc:7,  gf:-0.2, heatTol:0.95, altTol:0.35, est:true },
+  "Uruguay":       { g:"H", elo:1888, mv:600,  league:0.85, form:0, h:182.5, wc:15, gf:-0.25, heatTol:0.60, altTol:0.35, est:true },
 
-  "Francia":       { g:"I", elo:2063, mv:1460, league:1.00, form:4, h:184.9, wc:17, heatTol:0.45, altTol:0.35 },
-  "Senegal":       { g:"I", elo:1869, mv:550,  league:0.85, form:0, h:184.0, wc:4,  heatTol:0.95, altTol:0.35, est:true },
-  "Irak":          { g:"I", elo:1650, mv:25,   league:0.15, form:0, h:181.0, wc:2,  heatTol:0.90, altTol:0.35, est:true },
-  "Noruega":       { g:"I", elo:1914, mv:600,  league:0.90, form:5, h:187.2, wc:4,  heatTol:0.20, altTol:0.35 },
+  "Francia":       { g:"I", elo:2063, mv:1460, league:1.00, form:4, h:184.9, wc:17, gf:0.15, heatTol:0.45, altTol:0.35 },
+  "Senegal":       { g:"I", elo:1869, mv:550,  league:0.85, form:0, h:184.0, wc:4,  gf:-0.05, heatTol:0.95, altTol:0.35, est:true },
+  "Irak":          { g:"I", elo:1650, mv:25,   league:0.15, form:0, h:181.0, wc:2,  gf:-0.15, heatTol:0.90, altTol:0.35, est:true },
+  "Noruega":       { g:"I", elo:1914, mv:600,  league:0.90, form:5, h:187.2, wc:4,  gf:0.3, heatTol:0.20, altTol:0.35 },
 
-  "Argentina":     { g:"J", elo:2115, mv:739,  league:0.85, form:2, h:179.7, wc:19, heatTol:0.65, altTol:0.45 },
-  "Argelia":       { g:"J", elo:1776, mv:300,  league:0.80, form:0, h:182.0, wc:5,  heatTol:0.90, altTol:0.45, est:true },
-  "Austria":       { g:"J", elo:1792, mv:350,  league:0.85, form:0, h:185.0, wc:8,  heatTol:0.30, altTol:0.40, est:true },
-  "Jordania":      { g:"J", elo:1640, mv:23,   league:0.10, form:0, h:180.0, wc:1,  heatTol:0.90, altTol:0.40, est:true },
+  "Argentina":     { g:"J", elo:2115, mv:739,  league:0.85, form:2, h:179.7, wc:19, gf:-0.05, heatTol:0.65, altTol:0.45 },
+  "Argelia":       { g:"J", elo:1776, mv:300,  league:0.80, form:0, h:182.0, wc:5,  gf:0.0, heatTol:0.90, altTol:0.45, est:true },
+  "Austria":       { g:"J", elo:1792, mv:350,  league:0.85, form:0, h:185.0, wc:8,  gf:0.05, heatTol:0.30, altTol:0.40, est:true },
+  "Jordania":      { g:"J", elo:1640, mv:23,   league:0.10, form:0, h:180.0, wc:1,  gf:-0.15, heatTol:0.90, altTol:0.40, est:true },
 
-  "Portugal":      { g:"K", elo:1989, mv:1000, league:0.95, form:2, h:181.5, wc:9,  heatTol:0.60, altTol:0.35 },
-  "RD Congo":      { g:"K", elo:1722, mv:280,  league:0.80, form:0, h:183.0, wc:2,  heatTol:0.90, altTol:0.35, est:true },
-  "Uzbekistán":    { g:"K", elo:1700, mv:61,   league:0.15, form:0, h:183.0, wc:1,  heatTol:0.70, altTol:0.45, est:true },
-  "Colombia":      { g:"K", elo:1982, mv:600,  league:0.85, form:2, h:180.5, wc:7,  heatTol:0.80, altTol:0.85 },
+  "Portugal":      { g:"K", elo:1989, mv:1000, league:0.95, form:2, h:181.5, wc:9,  gf:0.2, heatTol:0.60, altTol:0.35 },
+  "RD Congo":      { g:"K", elo:1722, mv:280,  league:0.80, form:0, h:183.0, wc:2,  gf:0.0, heatTol:0.90, altTol:0.35, est:true },
+  "Uzbekistán":    { g:"K", elo:1700, mv:61,   league:0.15, form:0, h:183.0, wc:1,  gf:-0.1, heatTol:0.70, altTol:0.45, est:true },
+  "Colombia":      { g:"K", elo:1982, mv:600,  league:0.85, form:2, h:180.5, wc:7,  gf:0.05, heatTol:0.80, altTol:0.85 },
 
-  "Inglaterra":    { g:"L", elo:2024, mv:1400, league:1.00, form:5, h:184.2, wc:17, heatTol:0.35, altTol:0.30 },
-  "Croacia":       { g:"L", elo:1912, mv:380,  league:0.85, form:4, h:184.8, wc:7,  heatTol:0.40, altTol:0.35 },
-  "Ghana":         { g:"L", elo:1762, mv:280,  league:0.80, form:0, h:182.0, wc:5,  heatTol:0.95, altTol:0.35, est:true },
-  "Panamá":        { g:"L", elo:1690, mv:60,   league:0.35, form:0, h:180.0, wc:2,  heatTol:0.90, altTol:0.30, est:true },
+  "Inglaterra":    { g:"L", elo:2024, mv:1400, league:1.00, form:5, h:184.2, wc:17, gf:0.1, heatTol:0.35, altTol:0.30 },
+  "Croacia":       { g:"L", elo:1912, mv:380,  league:0.85, form:4, h:184.8, wc:7,  gf:-0.1, heatTol:0.40, altTol:0.35 },
+  "Ghana":         { g:"L", elo:1762, mv:280,  league:0.80, form:0, h:182.0, wc:5,  gf:0.0, heatTol:0.95, altTol:0.35, est:true },
+  "Panamá":        { g:"L", elo:1690, mv:60,   league:0.35, form:0, h:180.0, wc:2,  gf:-0.05, heatTol:0.90, altTol:0.30, est:true },
 };
 
 // Sedes 2026: alt en metros, heat 0–1 (junio/julio, día; techo+AC baja el índice).
@@ -170,7 +170,7 @@ function tau(x, y, la, lb) {
 }
 
 function predict(a, b, w, homeTeam, venue) {
-  const MU = 2.6, MAXG = 8;
+  const MAXG = 8;
   const v = venue || VENUES["Neutral"];
   let rA = effective(a, w) - altPts(a, v, w) - heatPts(a, v, w);
   let rB = effective(b, w) - altPts(b, v, w) - heatPts(b, v, w);
@@ -178,8 +178,11 @@ function predict(a, b, w, homeTeam, venue) {
   if (homeTeam === a) dR += w.host;
   if (homeTeam === b) dR -= w.host;
   let s = Math.max(-2.8, Math.min(2.8, dR / 250));
-  const la = Math.max(0.18, MU / 2 + s / 2);
-  const lb = Math.max(0.18, MU / 2 - s / 2);
+  const openness = TEAMS[a].gf + TEAMS[b].gf;
+  let mu = 2.5 + w.goals * openness + 0.25 * Math.abs(s);
+  mu = Math.max(1.6, Math.min(4.2, mu));
+  const la = Math.max(0.18, mu / 2 + s / 2);
+  const lb = Math.max(0.18, mu / 2 - s / 2);
   let pA = 0, pD = 0, pB = 0, total = 0, o15 = 0, o25 = 0, o35 = 0, btts = 0;
   const grid = [];
   for (let i = 0; i <= MAXG; i++)
@@ -364,13 +367,14 @@ function App() {
   const [b, setB] = useState("Uzbekistán");
   const [home, setHome] = useState("");
   const [venue, setVenue] = useState("CDMX · Azteca (2240m)");
-  const [w, setW] = useState({ mv:1.0, league:0.6, form:1.0, host:70, height:0.4, exp:0.4, alt:0.5, heat:0.3 });
+  const [w, setW] = useState({ mv:1.0, league:0.6, form:1.0, goals:1.0, host:70, height:0.4, exp:0.4, alt:0.5, heat:0.3 });
   const allNames = useMemo(() => names.slice().sort(), []);
   const venueNames = useMemo(() => Object.keys(VENUES), []);
   const sliders = [
     { k:"mv", label:"Valor de plantilla", min:0, max:2, step:0.1 },
     { k:"league", label:"Militancia en ligas top", min:0, max:2, step:0.1 },
     { k:"form", label:"Forma reciente", min:0, max:2, step:0.1 },
+    { k:"goals", label:"Tendencia de goles", min:0, max:2, step:0.1 },
     { k:"height", label:"Altura · balón parado", min:0, max:2, step:0.1 },
     { k:"exp", label:"Experiencia mundialista", min:0, max:2, step:0.1 },
     { k:"alt", label:"Altitud (sede)", min:0, max:2, step:0.1 },
@@ -455,7 +459,7 @@ function App() {
         <footer className="mt-8 pt-4 text-xs leading-relaxed" style={{ borderTop:`1px solid ${C.line}`, color:C.muted }}>
           Contexto de sede: la altitud penaliza a equipos no aclimatados (CDMX 2240m, Guadalajara 1560m) y el calor a los de clima frío,
           salvo sedes con techo+AC (Dallas, Houston, Atlanta). Tolerancias y altura de varias selecciones son proxies estimados (⚠),
-          con peso bajo por defecto porque aún no están calibrados contra histórico. Cuotas "justas" = 1÷probabilidad.
+          con peso bajo por defecto porque aún no están calibrados contra histórico. El total de goles ahora varía por partido (ofensividad de ambos equipos + desnivel), así que las líneas Más/Menos ya no son planas. Cuotas "justas" = 1÷probabilidad.
         </footer>
       </div>
     </div>
