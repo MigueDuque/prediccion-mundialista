@@ -177,9 +177,9 @@ function predict(a, b, w, homeTeam, venue) {
   let dR = rA - rB;
   if (homeTeam === a) dR += w.host;
   if (homeTeam === b) dR -= w.host;
-  let s = Math.max(-2.8, Math.min(2.8, dR / 250));
+  let s = Math.max(-2.8, Math.min(2.8, dR / 180));
   const openness = TEAMS[a].gf + TEAMS[b].gf;
-  let mu = 2.5 + w.goals * openness + 0.25 * Math.abs(s);
+  let mu = 2.5 + w.goals * 1.6 * openness + 0.45 * Math.abs(s);
   mu = Math.max(1.6, Math.min(4.2, mu));
   const la = Math.max(0.18, mu / 2 + s / 2);
   const lb = Math.max(0.18, mu / 2 - s / 2);
